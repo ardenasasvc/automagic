@@ -10,10 +10,9 @@ on:
 jobs:
   acls:
     runs-on: self-hosted
-    name: 
+    environment: witch-hut
     steps:
       - uses: actions/checkout@v3
-
       - name: Deploy ACL
         if: github.event_name == 'push'
         id: deploy-acl
