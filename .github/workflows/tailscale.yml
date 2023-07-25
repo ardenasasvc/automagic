@@ -21,7 +21,7 @@ jobs:
         with:
           api-key: ${{ secrets.TS_API_KEY }}
           tailnet: ${{ secrets.TS_TAILNET }}
-          action: apply
+          action: test
           policy-file: ./network/policy.hujson
 
 
