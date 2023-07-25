@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Test ACL 
-      - if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request'
         id: test-acl
         uses: tailscale/gitops-acl-action@v1
         with:
