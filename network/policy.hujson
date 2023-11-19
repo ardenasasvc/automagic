@@ -3,7 +3,6 @@
 	// Define the tags which can be applied to devices and by which users.
 	"tagOwners": {
 		"tag:lab":  ["ardenasasvc@github"],
-		"tag:byod": ["ardenasasvc@github"],
 		"tag:k8s-operator": [],
 		"tag:k8s": ["tag:k8s-operator"],
 	},
@@ -15,10 +14,10 @@
 			"src":    ["ardenasasvc@github"],
 			"dst":    ["*:*"],
 		},
-		// allow lab devices to talk to each other, and byod access to lab
+		// allow lab devices to talk to each other
 		{
 			"action": "accept",
-			"src":    ["tag:lab", "tag:byod"],
+			"src":    ["tag:lab"],
 			"dst":    ["tag:lab:*"],
 		},
 	],
@@ -30,13 +29,6 @@
 			"src":    ["autogroup:members"],
 			"dst":    ["autogroup:self"],
 			"users":  ["autogroup:nonroot", "root"],
-		},
-		// allow access ssh from byod to lab devices
-		{
-			"action": "accept",
-			"src":    ["tag:byod"],
-			"dst":    ["tag:lab"],
-			"users":  ["autogroup:nonroot", "root"],
-		},
+		}
 	]
 }
