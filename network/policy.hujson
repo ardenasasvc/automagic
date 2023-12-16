@@ -20,6 +20,12 @@
 			"src":    ["tag:lab"],
 			"dst":    ["tag:lab:*"],
 		},
+		// devices running as the same user can communicate over ssh
+		{
+			"action": "accept",
+			"src": ["*"],
+			"dst": ["autogroup:self:22"],
+		}
 	],
 	// Define users and devices that can use Tailscale SSH.
 	"ssh": [
