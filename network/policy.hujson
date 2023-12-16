@@ -25,6 +25,7 @@
 			"action": "accept",
 			"src": ["*"],
 			"dst": ["autogroup:self:22"],
+		}
 	],
 	// Define users and devices that can use Tailscale SSH.
 	"ssh": [
