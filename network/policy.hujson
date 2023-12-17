@@ -19,20 +19,14 @@
 			"action": "accept",
 			"src":    ["tag:lab"],
 			"dst":    ["tag:lab:*"],
-		},
-		// devices running as the same user can communicate over port 22
-		{
-			"action": "accept",
-			"src": ["*"],
-			"dst": ["autogroup:self:22"],
 		}
 	],
 	// Define users and devices that can use Tailscale SSH.
 	"ssh": [
 		{
-			"action": "accept",
+			"action": "check",
 			"src":    ["autogroup:members"],
-			"dst":    ["autogroup:self"],
+			"dst":    ["tag:lab"],
 			"users":  ["autogroup:nonroot", "root"],
 		},
 	]
