@@ -3,15 +3,13 @@
 	// Define the tags which can be applied to devices and by which users.
 	"tagOwners": {
 		"tag:lab":  ["ardenasasvc@github"],
-		"tag:k8s-operator": [],
-		"tag:k8s": ["tag:k8s-operator"],
 	},
 
 	"acls": [
 		// allow myself access to everything
 		{
 			"action": "accept",
-			"src":    ["ardenasasvc@github"],
+			"src":    ["autogroup:owner"],
 			"dst":    ["*:*"],
 		},
 		// allow lab devices to talk to each other
@@ -25,9 +23,9 @@
 	"ssh": [
 		{
 			"action": "check",
-			"src":    ["autogroup:members"],
-			"dst":    ["tag:lab"],
-			"users":  ["autogroup:nonroot", "root"],
+			"src":    ["autogroup:member"],
+			"dst":    ["autogroup:self"],
+			"users":  ["autogroup:nonroot"],
 		},
 	]
 }
