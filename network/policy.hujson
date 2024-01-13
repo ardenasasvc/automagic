@@ -27,5 +27,12 @@
 			"dst":    ["autogroup:self"],
 			"users":  ["autogroup:nonroot"],
 		},
+		{
+			"action": "allow",
+			"src":    ["tag:lab"],
+			"dst":    ["tag:lab"],
+			"users":  ["arden"],
+		},
+
 	]
 }
