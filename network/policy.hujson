@@ -27,7 +27,6 @@
 			"dst":    ["autogroup:self"],
 			"users":  ["autogroup:nonroot"],
 		},
-	],
 		{
 			"action": "accept",
 			"src":    ["tag:lab"],
