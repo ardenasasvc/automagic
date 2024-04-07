@@ -30,7 +30,8 @@ jobs:
         id: deploy-acl
         uses: tailscale/gitops-acl-action@v1
         with:
-          api-key: ${{ secrets.TS_API_KEY }}
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tailnet: ${{ secrets.TS_TAILNET }}
           action: apply
           policy-file: ./network/policy.hujson
