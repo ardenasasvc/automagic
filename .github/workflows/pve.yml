@@ -1,0 +1,22 @@
+name: Push scripts to pve
+on:
+  push:
+    branches: 
+      - main
+  pull_request:
+    branches: 
+      - main
+    
+jobs:
+  acls:
+    runs-on: self-hosted
+    environment: witch-hut
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Connect ephemeral job node to tailscale
+        uses: tailscale/gitops-action@v2
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:lab
