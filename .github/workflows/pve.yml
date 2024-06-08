@@ -3,9 +3,6 @@ on:
   push:
     branches: 
       - main
-  pull_request:
-    branches: 
-      - main
     
 jobs:
   acls:
@@ -20,3 +17,7 @@ jobs:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:lab
+
+          # job: copy pve-cert.sh to pve host
+
+          # job: create crontab entry for pve-cert.sh 
