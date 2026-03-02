@@ -1,0 +1,28 @@
+server {
+    root /var/www/notes.arden.social/html;
+    index index.html;
+
+    server_name arden.social notes.arden.social;
+
+    location / {
+        proxy_pass https://publish.obsidian.md/serve?url=notes.arden.social/;
+        proxy_ssl_server_name on;
+    }
+
+    listen 443 ssl;
+    ssl_certificate /etc/letsencrypt/live/notes.arden.social/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/notes.arden.social/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
+
+server {
+    listen 80;
+    server_name arden.social notes.arden.social;
+
+    if ($host = notes.arden.social) {
+        return 301 https://$host$request_uri;
+    }
+
+    return 301 https://notes.arden.social$request_uri;
+}

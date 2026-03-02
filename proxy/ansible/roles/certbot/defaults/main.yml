@@ -1,0 +1,3 @@
+---
+certbot_domain: "notes.arden.social"
+certbot_email: "hello@arden.social"

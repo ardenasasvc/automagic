@@ -1,0 +1,7 @@
+---
+- name: Configure proxy droplet
+  hosts: proxy
+  become: true
+  roles:
+    - nginx
+    - certbot

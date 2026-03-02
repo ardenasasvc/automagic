@@ -1,0 +1,56 @@
+---
+- name: Install nginx signing key
+  ansible.builtin.apt_key:
+    url: https://nginx.org/keys/nginx_signing.key
+    keyring: /usr/share/keyrings/nginx-archive-keyring.gpg
+    state: present
+
+- name: Add nginx mainline apt repository
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] https://nginx.org/packages/mainline/ubuntu/ {{ ansible_distribution_release }} nginx"
+    state: present
+    filename: nginx
+
+- name: Install nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+    update_cache: true
+
+- name: Deploy nginx.conf
+  ansible.builtin.copy:
+    src: "{{ role_path }}/../../../nginx/nginx.conf"
+    dest: /etc/nginx/nginx.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload nginx
+
+- name: Deploy site config
+  ansible.builtin.copy:
+    src: "{{ role_path }}/../../../nginx/sites-available/notes.arden.social"
+    dest: /etc/nginx/sites-available/notes.arden.social
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload nginx
+
+- name: Remove default conf.d site
+  ansible.builtin.file:
+    path: /etc/nginx/conf.d/default.conf
+    state: absent
+  notify: reload nginx
+
+- name: Enable notes.arden.social site
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/notes.arden.social
+    dest: /etc/nginx/sites-enabled/notes.arden.social
+    state: link
+  notify: reload nginx
+
+- name: Ensure nginx is enabled and running
+  ansible.builtin.service:
+    name: nginx
+    enabled: true
+    state: started
+
