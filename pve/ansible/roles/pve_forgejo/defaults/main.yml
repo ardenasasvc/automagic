@@ -1,0 +1,37 @@
+# LXC container
+pve_forgejo_node: "pve"
+pve_forgejo_vmid: 102
+pve_forgejo_hostname: "forge"
+pve_forgejo_password: "{{ vault_pve_forgejo_password }}"
+pve_forgejo_ostemplate: "local:vztmpl/debian-12-standard_12.12-1_amd64.tar.zst"
+pve_forgejo_template_name: "debian-12-standard_12.12-1_amd64.tar.zst"
+
+pve_forgejo_cores: 2
+pve_forgejo_memory: 1024
+pve_forgejo_disk: "local-lvm:20"
+pve_forgejo_onboot: true
+pve_forgejo_unprivileged: true
+
+pve_forgejo_ip: "192.168.1.102"
+pve_forgejo_cidr: 24
+pve_forgejo_gateway: "192.168.1.1"
+pve_forgejo_bridge: "vmbr0"
+pve_forgejo_nameserver: "1.1.1.1"
+
+# Forgejo
+pve_forgejo_version: "14.0.2"
+pve_forgejo_domain: "forge.lab.arden.social"
+pve_forgejo_port: 3000
+
+# Tailscale
+pve_forgejo_ts_authkey: "{{ vault_forgejo_ts_authkey }}"
+pve_forgejo_ts_hostname: "forge"
+
+# Runner
+pve_forgejo_runner_version: "12.7.1"
+pve_forgejo_runner_label: "ubuntu-latest:host"
+
+# Admin
+pve_forgejo_admin_user: "arden"
+pve_forgejo_admin_password: "{{ vault_forgejo_admin_password }}"
+pve_forgejo_admin_email: "arden@lab.arden.social"

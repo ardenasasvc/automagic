@@ -1,0 +1,35 @@
+pve_dns_node: "pve"
+pve_dns_vmid: 101
+pve_dns_hostname: "dns"
+pve_dns_password: "{{ vault_pve_dns_password }}"
+pve_dns_ostemplate: "local:vztmpl/debian-12-standard_12.12-1_amd64.tar.zst"
+pve_dns_template_name: "debian-12-standard_12.12-1_amd64.tar.zst"
+
+pve_dns_cores: 1
+pve_dns_memory: 512
+pve_dns_disk: "local-lvm:4"
+pve_dns_onboot: true
+pve_dns_unprivileged: true
+
+pve_dns_ip: "192.168.1.53"
+pve_dns_cidr: 24
+pve_dns_gateway: "192.168.1.1"
+pve_dns_bridge: "vmbr0"
+pve_dns_nameserver: "1.1.1.1"
+
+pve_dns_coredns_version: "1.12.1"
+pve_dns_zone: "lab.arden.social"
+pve_dns_forwarders:
+  - "1.1.1.1"
+  - "1.0.0.1"
+
+# A records for hosts managed by this playbook
+pve_dns_records:
+  - name: sno
+    ip: "192.168.1.100"
+  - name: api.sno
+    ip: "192.168.1.100"
+  - name: "*.apps.sno"
+    ip: "192.168.1.100"
+  - name: forge
+    ip: "192.168.1.102"

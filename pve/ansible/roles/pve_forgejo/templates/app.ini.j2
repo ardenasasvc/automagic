@@ -1,0 +1,26 @@
+APP_DATA_PATH = /var/lib/forgejo/data
+
+[server]
+DOMAIN = {{ pve_forgejo_domain }}
+ROOT_URL = http://{{ pve_forgejo_domain }}/
+HTTP_PORT = {{ pve_forgejo_port }}
+SSH_DOMAIN = {{ pve_forgejo_domain }}
+DISABLE_SSH = false
+LFS_START_SERVER = true
+
+[database]
+DB_TYPE = sqlite3
+PATH = /var/lib/forgejo/data/forgejo.db
+
+[repository]
+ROOT = /var/lib/forgejo/repos
+
+[security]
+INSTALL_LOCK = true
+
+[service]
+DISABLE_REGISTRATION = true
+
+[actions]
+ENABLED = true
+DEFAULT_ACTIONS_URL = https://code.forgejo.org

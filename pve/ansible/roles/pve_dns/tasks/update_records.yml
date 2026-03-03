@@ -1,0 +1,40 @@
+## Update DNS records (idempotent — runs on every apply)
+
+- name: Check if DNS container is running
+  ansible.builtin.command:
+    cmd: "pct status {{ pve_dns_vmid }}"
+  delegate_to: pve
+  check_mode: false
+  changed_when: false
+  register: ct_exists
+  failed_when: false
+
+- name: Update zone file for managed hosts
+  when: ct_exists.rc == 0
+  block:
+    - name: Stage updated zone file
+      ansible.builtin.template:
+        src: db.lab.arden.social.j2
+        dest: "/tmp/db.{{ pve_dns_zone }}"
+        mode: "0644"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Push updated zone file into container
+      ansible.builtin.command:
+        cmd: "pct push {{ pve_dns_vmid }} /tmp/db.{{ pve_dns_zone }} /etc/coredns/db.{{ pve_dns_zone }}"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Reload CoreDNS to pick up zone changes
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_dns_vmid }} -- systemctl reload coredns"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Clean up staged zone file
+      ansible.builtin.file:
+        path: "/tmp/db.{{ pve_dns_zone }}"
+        state: absent
+      delegate_to: pve
+      check_mode: false

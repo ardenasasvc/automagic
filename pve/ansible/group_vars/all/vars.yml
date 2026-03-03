@@ -1,0 +1,5 @@
+pve_api_host: "pve"
+pve_api_port: 8006
+pve_api_user: "automata@pve"
+pve_api_token_id: "automata-token"
+pve_api_token_secret: "{{ vault_pve_key }}"

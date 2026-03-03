@@ -1,0 +1,464 @@
+## Phase 1: LXC container via API (connection: local)
+
+- name: Update container template catalog
+  ansible.builtin.command:
+    cmd: pveam update
+  delegate_to: pve
+  check_mode: false
+  changed_when: false
+
+- name: Check if container template exists
+  ansible.builtin.command:
+    cmd: pveam list local
+  delegate_to: pve
+  check_mode: false
+  changed_when: false
+  register: pveam_list
+
+- name: Download container template
+  ansible.builtin.command:
+    cmd: "pveam download local {{ pve_forgejo_template_name }}"
+  delegate_to: pve
+  check_mode: false
+  when: pve_forgejo_template_name not in pveam_list.stdout
+
+- name: Create LXC container
+  community.proxmox.proxmox:
+    api_host: "{{ pve_api_host }}"
+    api_port: "{{ pve_api_port }}"
+    api_user: "{{ pve_api_user }}"
+    api_token_id: "{{ pve_api_token_id }}"
+    api_token_secret: "{{ pve_api_token_secret }}"
+    validate_certs: false
+    node: "{{ pve_forgejo_node }}"
+    vmid: "{{ pve_forgejo_vmid }}"
+    hostname: "{{ pve_forgejo_hostname }}"
+    password: "{{ pve_forgejo_password }}"
+    ostemplate: "{{ pve_forgejo_ostemplate }}"
+    state: present
+    cores: "{{ pve_forgejo_cores }}"
+    memory: "{{ pve_forgejo_memory }}"
+    disk: "{{ pve_forgejo_disk }}"
+    onboot: "{{ pve_forgejo_onboot }}"
+    unprivileged: "{{ pve_forgejo_unprivileged }}"
+    features:
+      - nesting=1
+    netif:
+      net0: "name=eth0,bridge={{ pve_forgejo_bridge }},ip={{ pve_forgejo_ip }}/{{ pve_forgejo_cidr }},gw={{ pve_forgejo_gateway }}"
+    nameserver: "{{ pve_forgejo_nameserver }}"
+
+- name: Start LXC container
+  community.proxmox.proxmox:
+    api_host: "{{ pve_api_host }}"
+    api_port: "{{ pve_api_port }}"
+    api_user: "{{ pve_api_user }}"
+    api_token_id: "{{ pve_api_token_id }}"
+    api_token_secret: "{{ pve_api_token_secret }}"
+    validate_certs: false
+    node: "{{ pve_forgejo_node }}"
+    vmid: "{{ pve_forgejo_vmid }}"
+    hostname: "{{ pve_forgejo_hostname }}"
+    state: started
+
+- name: Wait for container to be running
+  ansible.builtin.command:
+    cmd: "pct status {{ pve_forgejo_vmid }}"
+  delegate_to: pve
+  check_mode: false
+  changed_when: false
+  register: ct_status
+  until: "'running' in ct_status.stdout"
+  retries: 10
+  delay: 3
+
+## Phase 2: Provision Forgejo inside container (delegated to pve via SSH)
+
+- name: Check if container exists for provisioning
+  ansible.builtin.command:
+    cmd: "pct status {{ pve_forgejo_vmid }}"
+  delegate_to: pve
+  check_mode: false
+  changed_when: false
+  register: ct_exists
+  failed_when: false
+
+- name: Provision Forgejo
+  when: ct_exists.rc == 0
+  block:
+    # --- Stage templates on PVE host ---
+
+    - name: Create staging directory
+      ansible.builtin.file:
+        path: /tmp/forgejo-staging
+        state: directory
+        mode: "0700"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Stage app.ini
+      ansible.builtin.template:
+        src: app.ini.j2
+        dest: /tmp/forgejo-staging/app.ini
+        mode: "0644"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Stage forgejo.service
+      ansible.builtin.template:
+        src: forgejo.service.j2
+        dest: /tmp/forgejo-staging/forgejo.service
+        mode: "0644"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Stage tailscaled.service
+      ansible.builtin.template:
+        src: tailscaled.service.j2
+        dest: /tmp/forgejo-staging/tailscaled.service
+        mode: "0644"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Stage act_runner.service
+      ansible.builtin.template:
+        src: act_runner.service.j2
+        dest: /tmp/forgejo-staging/act_runner.service
+        mode: "0644"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Stage runner.yaml
+      ansible.builtin.template:
+        src: runner.yaml.j2
+        dest: /tmp/forgejo-staging/runner.yaml
+        mode: "0644"
+      delegate_to: pve
+      check_mode: false
+
+    # --- Install base packages ---
+
+    - name: Update apt cache inside container
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_forgejo_vmid }} -- apt-get update"
+      delegate_to: pve
+      check_mode: false
+      changed_when: false
+
+    - name: Install base packages
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_forgejo_vmid }} -- apt-get install -y curl git jq ca-certificates gnupg"
+      delegate_to: pve
+      check_mode: false
+      changed_when: false
+
+    # --- Install and configure Tailscale ---
+
+    - name: Add Tailscale GPG key
+      ansible.builtin.command:
+        cmd: >-
+          pct exec {{ pve_forgejo_vmid }} -- sh -c
+          'curl -fsSL https://pkgs.tailscale.com/stable/debian/bookworm.noarmor.gpg
+          -o /usr/share/keyrings/tailscale-archive-keyring.gpg'
+      delegate_to: pve
+      check_mode: false
+
+    - name: Add Tailscale apt source
+      ansible.builtin.command:
+        cmd: >-
+          pct exec {{ pve_forgejo_vmid }} -- sh -c
+          'echo "deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/debian bookworm main"
+          > /etc/apt/sources.list.d/tailscale.list'
+      delegate_to: pve
+      check_mode: false
+
+    - name: Update apt cache for Tailscale repo
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_forgejo_vmid }} -- apt-get update"
+      delegate_to: pve
+      check_mode: false
+      changed_when: false
+
+    - name: Install Tailscale
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_forgejo_vmid }} -- apt-get install -y tailscale"
+      delegate_to: pve
+      check_mode: false
+      changed_when: false
+
+    - name: Push custom tailscaled.service into container
+      ansible.builtin.command:
+        cmd: "pct push {{ pve_forgejo_vmid }} /tmp/forgejo-staging/tailscaled.service /etc/systemd/system/tailscaled.service"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Reload systemd and enable tailscaled
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_forgejo_vmid }} -- sh -c 'systemctl daemon-reload && systemctl enable --now tailscaled'"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Check Tailscale status
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_forgejo_vmid }} -- tailscale status"
+      delegate_to: pve
+      check_mode: false
+      changed_when: false
+      register: ts_status
+      failed_when: false
+
+    - name: Connect to Tailscale
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_forgejo_vmid }} -- tailscale up --authkey={{ pve_forgejo_ts_authkey }} --hostname={{ pve_forgejo_ts_hostname }}"
+      delegate_to: pve
+      check_mode: false
+      when: ts_status.rc != 0
+
+    # --- Install Forgejo ---
+
+    - name: Check if Forgejo binary exists
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_forgejo_vmid }} -- test -x /usr/local/bin/forgejo"
+      delegate_to: pve
+      check_mode: false
+      register: forgejo_binary
+      failed_when: false
+      changed_when: false
+
+    - name: Download Forgejo binary
+      ansible.builtin.command:
+        cmd: >-
+          pct exec {{ pve_forgejo_vmid }} -- sh -c
+          'curl -fsSL -o /usr/local/bin/forgejo
+          https://codeberg.org/forgejo/forgejo/releases/download/v{{ pve_forgejo_version }}/forgejo-{{ pve_forgejo_version }}-linux-amd64
+          && chmod +x /usr/local/bin/forgejo'
+      delegate_to: pve
+      check_mode: false
+      when: forgejo_binary.rc != 0
+
+    - name: Create forgejo system user
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_forgejo_vmid }} -- useradd -r -m -d /var/lib/forgejo -s /bin/bash forgejo"
+      delegate_to: pve
+      check_mode: false
+      register: useradd_result
+      failed_when: useradd_result.rc not in [0, 9]
+      changed_when: useradd_result.rc == 0
+
+    - name: Create Forgejo directories
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_forgejo_vmid }} -- mkdir -p /etc/forgejo /var/lib/forgejo/data /var/lib/forgejo/repos /var/lib/forgejo/custom"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Push app.ini into container
+      ansible.builtin.command:
+        cmd: "pct push {{ pve_forgejo_vmid }} /tmp/forgejo-staging/app.ini /etc/forgejo/app.ini"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Set ownership on Forgejo directories
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_forgejo_vmid }} -- sh -c 'chown -R forgejo:forgejo /var/lib/forgejo /etc/forgejo'"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Push forgejo.service into container
+      ansible.builtin.command:
+        cmd: "pct push {{ pve_forgejo_vmid }} /tmp/forgejo-staging/forgejo.service /etc/systemd/system/forgejo.service"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Enable and start Forgejo
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_forgejo_vmid }} -- sh -c 'systemctl daemon-reload && systemctl enable forgejo && systemctl restart forgejo'"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Wait for Forgejo to be ready
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_forgejo_vmid }} -- sh -c 'curl -sf http://localhost:3000/ > /dev/null'"
+      delegate_to: pve
+      check_mode: false
+      changed_when: false
+      register: forgejo_ready
+      until: forgejo_ready.rc == 0
+      retries: 15
+      delay: 2
+
+    # --- Create admin user ---
+
+    - name: Create Forgejo admin user
+      ansible.builtin.command:
+        argv:
+          - pct
+          - exec
+          - "{{ pve_forgejo_vmid }}"
+          - --
+          - runuser
+          - -u
+          - forgejo
+          - --
+          - env
+          - FORGEJO_WORK_DIR=/var/lib/forgejo
+          - /usr/local/bin/forgejo
+          - admin
+          - user
+          - create
+          - --admin
+          - --username
+          - "{{ pve_forgejo_admin_user }}"
+          - --password
+          - "{{ pve_forgejo_admin_password }}"
+          - --email
+          - "{{ pve_forgejo_admin_email }}"
+          - --config
+          - /etc/forgejo/app.ini
+      delegate_to: pve
+      check_mode: false
+      register: admin_create
+      failed_when: admin_create.rc not in [0, 1]
+      changed_when: admin_create.rc == 0
+
+    # --- Install and configure runner ---
+
+    - name: Check if forgejo-runner binary exists
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_forgejo_vmid }} -- test -x /usr/local/bin/forgejo-runner"
+      delegate_to: pve
+      check_mode: false
+      register: runner_binary
+      failed_when: false
+      changed_when: false
+
+    - name: Download forgejo-runner binary
+      ansible.builtin.command:
+        cmd: >-
+          pct exec {{ pve_forgejo_vmid }} -- sh -c
+          'curl -fsSL -o /usr/local/bin/forgejo-runner
+          https://code.forgejo.org/forgejo/runner/releases/download/v{{ pve_forgejo_runner_version }}/forgejo-runner-{{ pve_forgejo_runner_version }}-linux-amd64
+          && chmod +x /usr/local/bin/forgejo-runner'
+      delegate_to: pve
+      check_mode: false
+      when: runner_binary.rc != 0
+
+    - name: Push runner.yaml into container
+      ansible.builtin.command:
+        cmd: "pct push {{ pve_forgejo_vmid }} /tmp/forgejo-staging/runner.yaml /etc/forgejo/runner.yaml"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Generate runner registration token
+      ansible.builtin.command:
+        argv:
+          - pct
+          - exec
+          - "{{ pve_forgejo_vmid }}"
+          - --
+          - runuser
+          - -u
+          - forgejo
+          - --
+          - env
+          - FORGEJO_WORK_DIR=/var/lib/forgejo
+          - /usr/local/bin/forgejo
+          - forgejo-cli
+          - actions
+          - generate-runner-token
+          - --config
+          - /etc/forgejo/app.ini
+      delegate_to: pve
+      check_mode: false
+      register: runner_token
+      changed_when: false
+
+    - name: Check if runner is already registered
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_forgejo_vmid }} -- test -f /var/lib/forgejo/.runner"
+      delegate_to: pve
+      check_mode: false
+      register: runner_registered
+      failed_when: false
+      changed_when: false
+
+    - name: Register runner
+      ansible.builtin.command:
+        argv:
+          - pct
+          - exec
+          - "{{ pve_forgejo_vmid }}"
+          - --
+          - runuser
+          - -u
+          - forgejo
+          - --
+          - /usr/local/bin/forgejo-runner
+          - register
+          - --no-interactive
+          - --config
+          - /etc/forgejo/runner.yaml
+          - --token
+          - "{{ runner_token.stdout | trim }}"
+          - --instance
+          - http://localhost:3000
+          - --name
+          - forge
+          - --labels
+          - "{{ pve_forgejo_runner_label }}"
+      delegate_to: pve
+      check_mode: false
+      when: runner_registered.rc != 0
+
+    - name: Push act_runner.service into container
+      ansible.builtin.command:
+        cmd: "pct push {{ pve_forgejo_vmid }} /tmp/forgejo-staging/act_runner.service /etc/systemd/system/act_runner.service"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Enable and start act_runner
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_forgejo_vmid }} -- sh -c 'systemctl daemon-reload && systemctl enable --now act_runner'"
+      delegate_to: pve
+      check_mode: false
+
+    # --- Tailscale serve ---
+
+    - name: Expose Forgejo on tailnet
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_forgejo_vmid }} -- tailscale serve --bg 3000"
+      delegate_to: pve
+      check_mode: false
+
+    # --- Cleanup ---
+
+    - name: Clean up staging directory
+      ansible.builtin.file:
+        path: /tmp/forgejo-staging
+        state: absent
+      delegate_to: pve
+      check_mode: false
+
+## Verification
+
+- name: Verify Forgejo is running
+  ansible.builtin.command:
+    cmd: "pct exec {{ pve_forgejo_vmid }} -- systemctl is-active forgejo"
+  delegate_to: pve
+  check_mode: false
+  changed_when: false
+  when: ct_exists.rc == 0
+
+- name: Verify act_runner is running
+  ansible.builtin.command:
+    cmd: "pct exec {{ pve_forgejo_vmid }} -- systemctl is-active act_runner"
+  delegate_to: pve
+  check_mode: false
+  changed_when: false
+  when: ct_exists.rc == 0
+
+- name: Verify Tailscale is connected
+  ansible.builtin.command:
+    cmd: "pct exec {{ pve_forgejo_vmid }} -- tailscale status"
+  delegate_to: pve
+  check_mode: false
+  changed_when: false
+  when: ct_exists.rc == 0

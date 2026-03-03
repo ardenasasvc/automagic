@@ -1,0 +1,29 @@
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+        ca-certificates \
+        openssh-client \
+    && curl -fsSL https://pkgs.tailscale.com/stable/debian/bookworm.noarmor.gpg \
+        -o /usr/share/keyrings/tailscale-archive-keyring.gpg \
+    && curl -fsSL https://pkgs.tailscale.com/stable/debian/bookworm.tailscale-keyring.list \
+        -o /etc/apt/sources.list.d/tailscale.list \
+    && apt-get update && apt-get install -y --no-install-recommends \
+        tailscale \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir ansible-core proxmoxer requests
+
+COPY pve/ansible/ /ansible/
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+COPY vault-pass /secrets/vault-pass
+
+ENV TS_HOSTNAME=ansible-runner-pve
+
+RUN ansible-galaxy collection install -r /ansible/requirements.yml
+
+WORKDIR /ansible
+
+ENTRYPOINT ["/entrypoint.sh"]

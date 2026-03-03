@@ -1,0 +1,11 @@
+[Unit]
+Description=Tailscale node agent
+After=network-pre.target
+
+[Service]
+ExecStart=/usr/sbin/tailscaled --tun=userspace-networking --state=/var/lib/tailscale/tailscaled.state
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

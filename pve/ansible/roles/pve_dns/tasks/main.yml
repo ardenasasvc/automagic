@@ -1,0 +1,207 @@
+## Phase 1: LXC container via API (connection: local)
+
+- name: Update container template catalog
+  ansible.builtin.command:
+    cmd: pveam update
+  delegate_to: pve
+  check_mode: false
+  changed_when: false
+
+- name: Check if container template exists
+  ansible.builtin.command:
+    cmd: pveam list local
+  delegate_to: pve
+  check_mode: false
+  changed_when: false
+  register: pveam_list
+
+- name: Download container template
+  ansible.builtin.command:
+    cmd: "pveam download local {{ pve_dns_template_name }}"
+  delegate_to: pve
+  check_mode: false
+  when: pve_dns_template_name not in pveam_list.stdout
+
+- name: Create LXC container
+  community.proxmox.proxmox:
+    api_host: "{{ pve_api_host }}"
+    api_port: "{{ pve_api_port }}"
+    api_user: "{{ pve_api_user }}"
+    api_token_id: "{{ pve_api_token_id }}"
+    api_token_secret: "{{ pve_api_token_secret }}"
+    validate_certs: false
+    node: "{{ pve_dns_node }}"
+    vmid: "{{ pve_dns_vmid }}"
+    hostname: "{{ pve_dns_hostname }}"
+    password: "{{ pve_dns_password }}"
+    ostemplate: "{{ pve_dns_ostemplate }}"
+    state: present
+    cores: "{{ pve_dns_cores }}"
+    memory: "{{ pve_dns_memory }}"
+    disk: "{{ pve_dns_disk }}"
+    onboot: "{{ pve_dns_onboot }}"
+    unprivileged: "{{ pve_dns_unprivileged }}"
+    features:
+      - nesting=1
+    netif:
+      net0: "name=eth0,bridge={{ pve_dns_bridge }},ip={{ pve_dns_ip }}/{{ pve_dns_cidr }},gw={{ pve_dns_gateway }}"
+    nameserver: "{{ pve_dns_nameserver }}"
+
+- name: Start LXC container
+  community.proxmox.proxmox:
+    api_host: "{{ pve_api_host }}"
+    api_port: "{{ pve_api_port }}"
+    api_user: "{{ pve_api_user }}"
+    api_token_id: "{{ pve_api_token_id }}"
+    api_token_secret: "{{ pve_api_token_secret }}"
+    validate_certs: false
+    node: "{{ pve_dns_node }}"
+    vmid: "{{ pve_dns_vmid }}"
+    state: started
+
+- name: Wait for container to be running
+  ansible.builtin.command:
+    cmd: "pct status {{ pve_dns_vmid }}"
+  delegate_to: pve
+  check_mode: false
+  changed_when: false
+  register: ct_status
+  until: "'running' in ct_status.stdout"
+  retries: 10
+  delay: 3
+
+## Phase 2: Provision CoreDNS inside container (delegated to pve via SSH)
+
+- name: Check if container exists for provisioning
+  ansible.builtin.command:
+    cmd: "pct status {{ pve_dns_vmid }}"
+  delegate_to: pve
+  check_mode: false
+  changed_when: false
+  register: ct_exists
+  failed_when: false
+
+- name: Provision CoreDNS
+  when: ct_exists.rc == 0
+  block:
+    - name: Create staging directory
+      ansible.builtin.file:
+        path: /tmp/coredns-staging
+        state: directory
+        mode: "0700"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Stage Corefile
+      ansible.builtin.template:
+        src: Corefile.j2
+        dest: /tmp/coredns-staging/Corefile
+        mode: "0644"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Stage zone file
+      ansible.builtin.template:
+        src: db.lab.arden.social.j2
+        dest: "/tmp/coredns-staging/db.{{ pve_dns_zone }}"
+        mode: "0644"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Stage systemd unit
+      ansible.builtin.template:
+        src: coredns.service.j2
+        dest: /tmp/coredns-staging/coredns.service
+        mode: "0644"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Install curl inside container
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_dns_vmid }} -- apt-get update"
+      delegate_to: pve
+      check_mode: false
+      changed_when: false
+
+    - name: Install curl package
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_dns_vmid }} -- apt-get install -y curl"
+      delegate_to: pve
+      check_mode: false
+      changed_when: false
+
+    - name: Download CoreDNS binary
+      ansible.builtin.command:
+        cmd: >-
+          pct exec {{ pve_dns_vmid }} -- sh -c
+          'curl -fsSL https://github.com/coredns/coredns/releases/download/v{{ pve_dns_coredns_version }}/coredns_{{ pve_dns_coredns_version }}_linux_amd64.tgz
+          | tar -xz -C /usr/local/bin/'
+      delegate_to: pve
+      check_mode: false
+
+    - name: Create coredns system user
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_dns_vmid }} -- useradd -r -s /usr/sbin/nologin coredns"
+      delegate_to: pve
+      check_mode: false
+      register: useradd_result
+      failed_when: useradd_result.rc not in [0, 9]
+      changed_when: useradd_result.rc == 0
+
+    - name: Create coredns config directory
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_dns_vmid }} -- mkdir -p /etc/coredns"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Push Corefile into container
+      ansible.builtin.command:
+        cmd: "pct push {{ pve_dns_vmid }} /tmp/coredns-staging/Corefile /etc/coredns/Corefile"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Push zone file into container
+      ansible.builtin.command:
+        cmd: "pct push {{ pve_dns_vmid }} /tmp/coredns-staging/db.{{ pve_dns_zone }} /etc/coredns/db.{{ pve_dns_zone }}"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Push systemd unit into container
+      ansible.builtin.command:
+        cmd: "pct push {{ pve_dns_vmid }} /tmp/coredns-staging/coredns.service /etc/systemd/system/coredns.service"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Set cap_net_bind_service on coredns binary
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_dns_vmid }} -- setcap cap_net_bind_service=+ep /usr/local/bin/coredns"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Enable and start CoreDNS
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_dns_vmid }} -- systemctl enable --now coredns"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Clean up staging directory
+      ansible.builtin.file:
+        path: /tmp/coredns-staging
+        state: absent
+      delegate_to: pve
+      check_mode: false
+
+- name: Verify CoreDNS is running
+  ansible.builtin.command:
+    cmd: "pct exec {{ pve_dns_vmid }} -- systemctl is-active coredns"
+  delegate_to: pve
+  check_mode: false
+  changed_when: false
+  when: ct_exists.rc == 0
+
+## Update DNS records (idempotent — runs on every apply)
+
+- name: Update DNS records
+  ansible.builtin.include_tasks: update_records.yml
+  tags:
+    - dns-records

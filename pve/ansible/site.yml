@@ -1,0 +1,9 @@
+---
+- name: Provision Proxmox infrastructure
+  hosts: local
+  gather_facts: false
+  roles:
+    - pve_user
+    - pve_vm
+    - pve_dns
+    - pve_forgejo

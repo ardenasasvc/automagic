@@ -1,0 +1,56 @@
+- name: Enable automata user
+  community.proxmox.proxmox_user:
+    api_host: "{{ pve_api_host }}"
+    api_port: "{{ pve_api_port }}"
+    api_user: "{{ pve_api_user }}"
+    api_token_id: "{{ pve_api_token_id }}"
+    api_token_secret: "{{ pve_api_token_secret }}"
+    validate_certs: false
+    userid: "{{ pve_target_user }}"
+    state: present
+    enable: true
+
+- name: Grant Administrator role on /
+  community.proxmox.proxmox_access_acl:
+    api_host: "{{ pve_api_host }}"
+    api_port: "{{ pve_api_port }}"
+    api_user: "{{ pve_api_user }}"
+    api_token_id: "{{ pve_api_token_id }}"
+    api_token_secret: "{{ pve_api_token_secret }}"
+    validate_certs: false
+    path: /
+    roleid: "{{ pve_target_role }}"
+    ugid: "{{ pve_target_user }}"
+    type: user
+    propagate: true
+    state: present
+
+- name: Check if API token already exists
+  ansible.builtin.uri:
+    url: "https://{{ pve_api_host }}:{{ pve_api_port }}/api2/json/access/users/{{ pve_target_user | urlencode }}/token/{{ pve_target_token_name }}"
+    method: GET
+    headers:
+      Authorization: "PVEAPIToken={{ pve_api_user }}!{{ pve_api_token_id }}={{ pve_api_token_secret }}"
+    validate_certs: false
+    status_code: [200, 500]
+  check_mode: false
+  register: token_check
+
+- name: Create API token
+  ansible.builtin.uri:
+    url: "https://{{ pve_api_host }}:{{ pve_api_port }}/api2/json/access/users/{{ pve_target_user | urlencode }}/token/{{ pve_target_token_name }}"
+    method: POST
+    headers:
+      Authorization: "PVEAPIToken={{ pve_api_user }}!{{ pve_api_token_id }}={{ pve_api_token_secret }}"
+    body_format: form-urlencoded
+    body:
+      privsep: "0"
+    validate_certs: false
+    status_code: 200
+  register: token_result
+  when: token_check.status == 500
+
+- name: Display API token value
+  ansible.builtin.debug:
+    msg: "Token: {{ token_result.json.data['full-tokenid'] }} = {{ token_result.json.data.value }}"
+  when: token_result is not skipped

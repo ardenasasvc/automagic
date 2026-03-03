@@ -1,0 +1,5 @@
+# Bootstrap auth — uses root@pam to create the automata user/token.
+# Overrides group_vars/all.yml which defaults to automata@pve.
+pve_api_user: "root@pam"
+pve_api_token_id: "roottoken"
+pve_api_token_secret: "{{ vault_pve_root_key }}"

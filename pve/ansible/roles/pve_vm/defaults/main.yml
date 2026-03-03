@@ -1,0 +1,15 @@
+pve_vm_node: "pve"
+pve_vm_id: 100
+pve_vm_name: "sno"
+
+pve_vm_cores: 8
+pve_vm_memory: 32768
+pve_vm_bios: "ovmf"
+pve_vm_cpu_type: "host"
+
+pve_vm_storage: "local-lvm"
+pve_vm_boot_disk_size: "120"
+pve_vm_data_disk_size: "50"
+pve_vm_bridge: "vmbr0"
+
+pve_vm_start: false

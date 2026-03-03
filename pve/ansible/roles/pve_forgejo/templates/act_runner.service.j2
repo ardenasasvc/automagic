@@ -1,0 +1,15 @@
+[Unit]
+Description=Forgejo Actions Runner
+After=forgejo.service
+
+[Service]
+Type=simple
+User=forgejo
+Group=forgejo
+WorkingDirectory=/var/lib/forgejo
+ExecStart=/usr/local/bin/forgejo-runner daemon --config /etc/forgejo/runner.yaml
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

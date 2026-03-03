@@ -1,0 +1,3 @@
+pve_target_user: "automata@pve"
+pve_target_role: "Administrator"
+pve_target_token_name: "automata-token"

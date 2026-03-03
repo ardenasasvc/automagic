@@ -1,0 +1,17 @@
+$ORIGIN {{ pve_dns_zone }}.
+$TTL 3600
+
+@   IN  SOA ns.{{ pve_dns_zone }}. admin.{{ pve_dns_zone }}. (
+        {{ ansible_date_time.epoch | default('2024010101') }}  ; serial
+        3600        ; refresh
+        600         ; retry
+        604800      ; expire
+        300         ; negative cache TTL
+    )
+
+    IN  NS  ns.{{ pve_dns_zone }}.
+
+ns      IN  A   {{ pve_dns_ip }}
+{% for record in pve_dns_records %}
+{{ "%-15s" | format(record.name) }} IN  A   {{ record.ip }}
+{% endfor %}

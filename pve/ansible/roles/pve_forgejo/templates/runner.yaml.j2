@@ -1,0 +1,9 @@
+log:
+  level: info
+
+runner:
+  file: /var/lib/forgejo/.runner
+  capacity: 1
+  timeout: 3h
+  labels:
+    - "{{ pve_forgejo_runner_label }}"

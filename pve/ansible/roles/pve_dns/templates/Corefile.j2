@@ -1,0 +1,12 @@
+{{ pve_dns_zone }} {
+    file /etc/coredns/db.{{ pve_dns_zone }}
+    log
+    errors
+}
+
+. {
+    forward . {{ pve_dns_forwarders | join(' ') }}
+    log
+    errors
+    cache 30
+}

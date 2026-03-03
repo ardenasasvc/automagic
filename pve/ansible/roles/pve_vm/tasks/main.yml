@@ -1,0 +1,53 @@
+- name: Create VM
+  community.proxmox.proxmox_kvm:
+    api_host: "{{ pve_api_host }}"
+    api_port: "{{ pve_api_port }}"
+    api_user: "{{ pve_api_user }}"
+    api_token_id: "{{ pve_api_token_id }}"
+    api_token_secret: "{{ pve_api_token_secret }}"
+    validate_certs: false
+    node: "{{ pve_vm_node }}"
+    vmid: "{{ pve_vm_id }}"
+    name: "{{ pve_vm_name }}"
+    state: present
+    cores: "{{ pve_vm_cores }}"
+    memory: "{{ pve_vm_memory }}"
+    bios: "{{ pve_vm_bios }}"
+    cpu: "{{ pve_vm_cpu_type }}"
+    scsihw: virtio-scsi-pci
+    scsi:
+      scsi0: "{{ pve_vm_storage }}:{{ pve_vm_boot_disk_size }}"
+    net:
+      net0: "virtio,bridge={{ pve_vm_bridge }}"
+    efidisk0:
+      storage: "{{ pve_vm_storage }}"
+      format: raw
+      efitype: 4m
+      pre_enrolled_keys: false
+
+- name: Add data disk
+  community.proxmox.proxmox_disk:
+    api_host: "{{ pve_api_host }}"
+    api_port: "{{ pve_api_port }}"
+    api_user: "{{ pve_api_user }}"
+    api_token_id: "{{ pve_api_token_id }}"
+    api_token_secret: "{{ pve_api_token_secret }}"
+    validate_certs: false
+    vmid: "{{ pve_vm_id }}"
+    disk: scsi1
+    storage: "{{ pve_vm_storage }}"
+    size: "{{ pve_vm_data_disk_size }}"
+    state: present
+
+- name: Start VM
+  community.proxmox.proxmox_kvm:
+    api_host: "{{ pve_api_host }}"
+    api_port: "{{ pve_api_port }}"
+    api_user: "{{ pve_api_user }}"
+    api_token_id: "{{ pve_api_token_id }}"
+    api_token_secret: "{{ pve_api_token_secret }}"
+    validate_certs: false
+    node: "{{ pve_vm_node }}"
+    vmid: "{{ pve_vm_id }}"
+    state: started
+  when: pve_vm_start
