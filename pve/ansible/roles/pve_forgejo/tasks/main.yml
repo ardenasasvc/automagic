@@ -119,6 +119,22 @@
       delegate_to: pve
       check_mode: false
 
+    - name: Stage Caddyfile
+      ansible.builtin.template:
+        src: Caddyfile.j2
+        dest: /tmp/forgejo-staging/Caddyfile
+        mode: "0644"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Stage caddy.service
+      ansible.builtin.template:
+        src: caddy.service.j2
+        dest: /tmp/forgejo-staging/caddy.service
+        mode: "0644"
+      delegate_to: pve
+      check_mode: false
+
     - name: Stage act_runner.service
       ansible.builtin.template:
         src: act_runner.service.j2
@@ -285,6 +301,62 @@
       retries: 15
       delay: 2
 
+    # --- Install and configure Caddy reverse proxy ---
+
+    - name: Check if Caddy binary exists
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_forgejo_vmid }} -- test -x /usr/local/bin/caddy"
+      delegate_to: pve
+      check_mode: false
+      register: caddy_binary
+      failed_when: false
+      changed_when: false
+
+    - name: Download Caddy binary
+      ansible.builtin.command:
+        cmd: >-
+          pct exec {{ pve_forgejo_vmid }} -- sh -c
+          'curl -fsSL
+          https://github.com/caddyserver/caddy/releases/download/v{{ pve_forgejo_caddy_version }}/caddy_{{ pve_forgejo_caddy_version }}_linux_amd64.tar.gz
+          | tar -xzf - -C /tmp caddy && mv /tmp/caddy /usr/local/bin/caddy
+          && chmod +x /usr/local/bin/caddy'
+      delegate_to: pve
+      check_mode: false
+      when: caddy_binary.rc != 0
+
+    - name: Create caddy system user
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_forgejo_vmid }} -- useradd -r -d /var/lib/caddy -s /usr/sbin/nologin caddy"
+      delegate_to: pve
+      check_mode: false
+      register: caddy_useradd
+      failed_when: caddy_useradd.rc not in [0, 9]
+      changed_when: caddy_useradd.rc == 0
+
+    - name: Create Caddy config directory
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_forgejo_vmid }} -- mkdir -p /etc/caddy"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Push Caddyfile into container
+      ansible.builtin.command:
+        cmd: "pct push {{ pve_forgejo_vmid }} /tmp/forgejo-staging/Caddyfile /etc/caddy/Caddyfile"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Push caddy.service into container
+      ansible.builtin.command:
+        cmd: "pct push {{ pve_forgejo_vmid }} /tmp/forgejo-staging/caddy.service /etc/systemd/system/caddy.service"
+      delegate_to: pve
+      check_mode: false
+
+    - name: Enable and start Caddy
+      ansible.builtin.command:
+        cmd: "pct exec {{ pve_forgejo_vmid }} -- sh -c 'systemctl daemon-reload && systemctl enable --now caddy'"
+      delegate_to: pve
+      check_mode: false
+
     # --- Create admin user ---
 
     - name: Create Forgejo admin user
@@ -450,6 +522,14 @@
 - name: Verify act_runner is running
   ansible.builtin.command:
     cmd: "pct exec {{ pve_forgejo_vmid }} -- systemctl is-active act_runner"
+  delegate_to: pve
+  check_mode: false
+  changed_when: false
+  when: ct_exists.rc == 0
+
+- name: Verify Caddy is running
+  ansible.builtin.command:
+    cmd: "pct exec {{ pve_forgejo_vmid }} -- systemctl is-active caddy"
   delegate_to: pve
   check_mode: false
   changed_when: false

@@ -26,9 +26,9 @@
       delegate_to: pve
       check_mode: false
 
-    - name: Reload CoreDNS to pick up zone changes
+    - name: Restart CoreDNS to pick up zone changes
       ansible.builtin.command:
-        cmd: "pct exec {{ pve_dns_vmid }} -- systemctl reload coredns"
+        cmd: "pct exec {{ pve_dns_vmid }} -- systemctl restart coredns"
       delegate_to: pve
       check_mode: false
 

@@ -20,7 +20,8 @@ pve_forgejo_nameserver: "1.1.1.1"
 
 # Forgejo
 pve_forgejo_version: "14.0.2"
-pve_forgejo_domain: "forge.lab.arden.social"
+pve_forgejo_caddy_version: "2.9.1"
+pve_forgejo_domain: "forge.cat-skate.ts.net"
 pve_forgejo_port: 3000
 
 # Tailscale

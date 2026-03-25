@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --no-cache-dir ansible-core
 
 COPY proxy/ansible/ /ansible/
+COPY ansible.cfg /ansible/ansible.cfg
 COPY proxy/nginx/ /nginx/
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

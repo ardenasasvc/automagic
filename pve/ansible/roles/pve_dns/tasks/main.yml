@@ -203,5 +203,3 @@
 
 - name: Update DNS records
   ansible.builtin.include_tasks: update_records.yml
-  tags:
-    - dns-records

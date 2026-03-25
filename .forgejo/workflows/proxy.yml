@@ -1,0 +1,27 @@
+name: Deploy Proxy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'proxy/**'
+      - 'ansible.cfg'
+      - '.forgejo/workflows/proxy.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: pip install --quiet --break-system-packages ansible-core
+
+      - name: Write vault password
+        run: echo "${{ secrets.VAULT_PASS }}" > vault-pass
+
+      - name: Install Galaxy collections
+        run: ansible-galaxy collection install -r proxy/ansible/requirements.yml
+
+      - name: Run playbook
+        run: ansible-playbook -i proxy/ansible/inventory.ini proxy/ansible/site.yml

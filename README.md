@@ -42,7 +42,7 @@ ansible-playbook -i pve/ansible/inventory.ini pve/ansible/site.yml --check
 ansible-playbook -i pve/ansible/inventory.ini pve/ansible/site.yml
 
 # update DNS records only
-ansible-playbook -i pve/ansible/inventory.ini pve/ansible/site.yml --tags dns-records
+ansible-playbook -i pve/ansible/inventory.ini pve/ansible/update-dns.yml
 ```
 
 ## Container alternative

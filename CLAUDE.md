@@ -42,7 +42,7 @@ ansible-playbook -i pve/ansible/inventory.ini pve/ansible/site.yml --check
 ansible-playbook -i pve/ansible/inventory.ini pve/ansible/site.yml
 
 # update DNS records only
-ansible-playbook -i pve/ansible/inventory.ini pve/ansible/site.yml --tags dns-records
+ansible-playbook -i pve/ansible/inventory.ini pve/ansible/update-dns.yml
 ```
 
 ### Container alternative
@@ -68,6 +68,15 @@ podman run --rm -e TS_AUTHKEY=... -e DRY_RUN=false automagic-pve     # apply
 - **Ansible roles** — `proxy/ansible/roles/{nginx,certbot}`. Roles reference source configs via relative paths (`{{ role_path }}/../../../nginx/`).
 - **Inventory** — `proxy/ansible/inventory.ini` uses the Tailscale hostname `proxy` to reach the target host.
 - **PVE playbook** — `pve/ansible/roles/pve_user`. Uses `connection: local` and talks to the Proxmox API over HTTPS. Auth is `PVEAPIToken` via vault-encrypted variables.
+
+## CI/CD
+
+Forgejo Actions workflows in `.forgejo/workflows/` auto-deploy on push to `main`:
+
+- **`proxy.yml`** — Triggered by changes in `proxy/`. Runs the proxy playbook.
+- **`pve.yml`** — Triggered by changes in `pve/`. Runs the PVE playbook.
+
+Both run directly on the `forge` LXC runner (`ubuntu-latest:host`) which is on the Tailscale network. The `VAULT_PASS` secret must be configured in Forgejo repo settings (Settings > Actions > Secrets).
 
 ## Secrets
 

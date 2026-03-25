@@ -1,0 +1,9 @@
+---
+- name: Update DNS records
+  hosts: local
+  gather_facts: false
+  tasks:
+    - name: Update DNS records
+      ansible.builtin.include_role:
+        name: pve_dns
+        tasks_from: update_records
